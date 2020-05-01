@@ -4,18 +4,19 @@
 #include <math.h>
 
 typedef struct {
-	unsigned char inst[4];
-	unsigned char full_bin[33];
-	unsigned char op[7];
-	unsigned char fn[7];
-} BCode;
-
-typedef struct {
 	unsigned char b6_b10[6];
 	unsigned char b11_b15[6];
 	unsigned char b16_b20[6];
 	unsigned char b21_b25[6];
 } BParsed;
+
+typedef struct {
+	unsigned char inst[4];
+	unsigned char full_bin[33];
+	unsigned char op[7];
+	unsigned char fn[7];
+	BParsed bp;
+} BCode;
 
 typedef struct {
 	int num;
@@ -28,7 +29,7 @@ typedef struct {
 	char full_bin[33];
 } Mem_4;
 
-void initMem(Mem_4* m, long i);
+void initMem(Mem_4* m, long l);
 
 void shell(char* c);
 void readFile(FILE* f, BCode* li);
@@ -62,24 +63,25 @@ int main() {
 	char command[100];
 	char* object;
 	int i = 0;
+	int list_len = 0;
 
 	char init[33] = "00000000000000000000000000000000";
 	Register reg[32];
-	Register PC;
-	PC.num = -1;
-	strcpy(PC.full_bin, init);
+	Register PC = { -1, init };
 	for (i; i < 32; i++) {
 		strcpy(reg[i].full_bin, init);
 	}
+	BCode* inst_list = (BCode*)malloc(sizeof(BCode) * list_len);
+	Mem_4* memory = (Mem_4*)malloc(sizeof(Mem_4) * list_len);
 
 	while (1) {
-		int list_len = 0;
-		BCode* inst_list = (BCode*)malloc(sizeof(BCode) * list_len);
-		Mem_4* memory = (Mem_4*)malloc(sizeof(Mem_4) * list_len);
 		shell(command);
 
-		if (strcmp(command, "exit") == 0)
+		if (strcmp(command, "exit") == 0) {
+			free(inst_list);
+			free(memory);
 			break;
+		}
 
 		else if (strlen(command) == 0)
 			continue;
@@ -88,27 +90,27 @@ int main() {
 			object = strtok(command, " ");
 			if (!strcmp(object, "read")) {
 				if (object = strtok(NULL, " ")) {
+					list_len = 0;
+					i = 0;
 					unsigned char buffer[4];
 					FILE* len = fopen(object, "rb");
 					if (!len)
 						continue;
-
 					while (fread(buffer, sizeof(unsigned char), 4, len) != 0)
 						list_len++;
 					fclose(len);
 
 					FILE* f = fopen(object, "rb");
 					inst_list = (BCode*)realloc(inst_list, sizeof(BCode) * list_len);
-					int i = 0;
-
 					readFile(f, inst_list);
 					inst_config(inst_list, list_len);
 
-					for (i; i < list_len; i++)
+					for (i; i < list_len; i++) {
+						inst_list[i].bp = parse_inst_bin(inst_list[i]);
 						alprint_master(inst_list[i], i);
+					}
 
-					free(inst_list);
-					free(memory);
+					fclose(f);
 					continue;
 				}
 				else {
@@ -118,6 +120,7 @@ int main() {
 			}
 			else if (strcmp(object, "loadinst") == 0) {
 				if (object = strtok(NULL, " ")) {
+					list_len = 0;
 					unsigned char buffer[4];
 					FILE* len = fopen(object, "rb");
 					if (!len)
@@ -135,13 +138,7 @@ int main() {
 					readFile(f, inst_list);
 					inst_config(inst_list, list_len);
 					inst_mem_config(inst_list, list_len, memory);
-
 					
-
-
-
-					free(inst_list);
-					free(memory);
 					fclose(f);
 					continue;
 				}
@@ -162,7 +159,7 @@ int main() {
 	return 0;
 }
 
-void initMem(Mem_4* m, int l) {
+void initMem(Mem_4* m, long l) {
 	long i = 0;
 	for (i; i < l; i++) {
 		strcpy(m[i].full_bin, "11111111111111111111111111111111");
@@ -213,7 +210,7 @@ void inst_mem_config(BCode* li, int len, Mem_4* m) {
 	for (i; i < len; i++)
 		strcpy(m[i].full_bin, li[i].full_bin);
 	// for (i = 0; i < len; i++)
-	//	printf("[%05d] %ld | 0x%lx | %s\n", i, m[i].i, m[i].address, m[i].full_bin);
+	//	printf("[%05d] %05ld | 0x%08lx | %s\n", i, m[i].i, m[i].address, m[i].full_bin);
 }
 
 
@@ -280,105 +277,104 @@ void hex2bin(unsigned char h, char* dd, int r) {
 }
 
 void alprint_master(BCode b, int i) {
-	BParsed bp = parse_inst_bin(b);
 	if (!strcmp(b.op, "000000")) {
 		if (!strcmp(b.fn, "101011")) // SLTU
-			alprint_inst_3ar(b, i, "sltu", bp);
+			alprint_inst_3ar(b, i, "sltu", b.bp);
 		else if (!strcmp(b.fn, "101010")) // SLT
-			alprint_inst_3ar(b, i, "slt", bp);
+			alprint_inst_3ar(b, i, "slt", b.bp);
 		else if (!strcmp(b.fn, "100111")) // NOR
-			alprint_inst_3ar(b, i, "nor", bp);
+			alprint_inst_3ar(b, i, "nor", b.bp);
 		else if (!strcmp(b.fn, "100110")) // XOR
-			alprint_inst_3ar(b, i, "xor", bp);
+			alprint_inst_3ar(b, i, "xor", b.bp);
 		else if (!strcmp(b.fn, "100101")) // OR
-			alprint_inst_3ar(b, i, "or", bp);
+			alprint_inst_3ar(b, i, "or", b.bp);
 		else if (!strcmp(b.fn, "100100")) // AND
-			alprint_inst_3ar(b, i, "and", bp);
+			alprint_inst_3ar(b, i, "and", b.bp);
 		else if (!strcmp(b.fn, "100011")) // SUBU
-			alprint_inst_3ar(b, i, "subu", bp);
+			alprint_inst_3ar(b, i, "subu", b.bp);
 		else if (!strcmp(b.fn, "100010")) // SUB
-			alprint_inst_3ar(b, i, "sub", bp);
+			alprint_inst_3ar(b, i, "sub", b.bp);
 		else if (!strcmp(b.fn, "100001")) // ADDU
-			alprint_inst_3ar(b, i, "addu", bp);
+			alprint_inst_3ar(b, i, "addu", b.bp);
 		else if (!strcmp(b.fn, "100000")) // ADD
-			alprint_inst_3ar(b, i, "add", bp);
+			alprint_inst_3ar(b, i, "add", b.bp);
 		else if (!strcmp(b.fn, "000111")) // SRAV
-			alprint_inst_3sh(b, i, "srav", bp);
+			alprint_inst_3sh(b, i, "srav", b.bp);
 		else if (!strcmp(b.fn, "000110")) // SRLV
-			alprint_inst_3sh(b, i, "srlv", bp);
+			alprint_inst_3sh(b, i, "srlv", b.bp);
 		else if (!strcmp(b.fn, "000100")) // SLLV
-			alprint_inst_3sh(b, i, "sllv", bp);
+			alprint_inst_3sh(b, i, "sllv", b.bp);
 		else if (!strcmp(b.fn, "000010")) // SRL
-			alprint_inst_3sl(b, i, "srl", bp);
+			alprint_inst_3sl(b, i, "srl", b.bp);
 		else if (!strcmp(b.fn, "000000")) // SLL
-			alprint_inst_3sl(b, i, "sll", bp);
+			alprint_inst_3sl(b, i, "sll", b.bp);
 		else if (!strcmp(b.fn, "000011")) // SRA
-			alprint_inst_3sl(b, i, "sll", bp);
+			alprint_inst_3sl(b, i, "sll", b.bp);
 		else if (!strcmp(b.fn, "011011")) // DIVU
-			alprint_inst_md(b, i, "divu", bp);
+			alprint_inst_md(b, i, "divu", b.bp);
 		else if (!strcmp(b.fn, "011010")) // DIV
-			alprint_inst_md(b, i, "div", bp);
+			alprint_inst_md(b, i, "div", b.bp);
 		else if (!strcmp(b.fn, "011001")) // MULTU
-			alprint_inst_md(b, i, "multu", bp);
+			alprint_inst_md(b, i, "multu", b.bp);
 		else if (!strcmp(b.fn, "011000")) // MULT
-			alprint_inst_md(b, i, "mult", bp);
+			alprint_inst_md(b, i, "mult", b.bp);
 		else if (!strcmp(b.fn, "001001")) // JALR
-			alprint_inst_1rs(b, i, "jalr", bp);
+			alprint_inst_1rs(b, i, "jalr", b.bp);
 		else if (!strcmp(b.fn, "010011")) // MTLO
-			alprint_inst_1rs(b, i, "mtlo", bp);
+			alprint_inst_1rs(b, i, "mtlo", b.bp);
 		else if (!strcmp(b.fn, "010001")) // MTHI
-			alprint_inst_1rs(b, i, "mthi", bp);
+			alprint_inst_1rs(b, i, "mthi", b.bp);
 		else if (!strcmp(b.fn, "001000")) // JR
-			alprint_inst_1rs(b, i, "jr", bp);
+			alprint_inst_1rs(b, i, "jr", b.bp);
 		else if (!strcmp(b.fn, "010010")) // MFLO
-			alprint_inst_mf(b, i, "mflo", bp);
+			alprint_inst_mf(b, i, "mflo", b.bp);
 		else if (!strcmp(b.fn, "010000")) // MFHI
-			alprint_inst_mf(b, i, "mfhi", bp);
+			alprint_inst_mf(b, i, "mfhi", b.bp);
 		else if (!strcmp(b.fn, "001100")) // SYSCALL
 			alprint_inst_sys(b, i, "syscall");
 		else
 			alprint_unknown(b, i);
 	}
 	else if (!strcmp(b.op, "000010")) // J
-		alprint_inst_j(b, i, "j", bp);
+		alprint_inst_j(b, i, "j", b.bp);
 	else if (!strcmp(b.op, "000011")) // JAL
-		alprint_inst_j(b, i, "jal", bp);
+		alprint_inst_j(b, i, "jal", b.bp);
 	else if (!strcmp(b.op, "000100")) // BEQ
-		alprint_inst_2off(b, i, "beq", bp);
+		alprint_inst_2off(b, i, "beq", b.bp);
 	else if (!strcmp(b.op, "000101")) // BNE
-		alprint_inst_2off(b, i, "bne", bp);
+		alprint_inst_2off(b, i, "bne", b.bp);
 	else if (!strcmp(b.op, "001000")) // ADDI
-		alprint_inst_imm(b, i, "addi", bp);
+		alprint_inst_imm(b, i, "addi", b.bp);
 	else if (!strcmp(b.op, "001001")) // ADDIU
-		alprint_inst_imm(b, i, "addiu", bp);
+		alprint_inst_imm(b, i, "addiu", b.bp);
 	else if (!strcmp(b.op, "001010")) // SLTI
-		alprint_inst_imm(b, i, "slti", bp);
+		alprint_inst_imm(b, i, "slti", b.bp);
 	else if (!strcmp(b.op, "001011")) // SLTIU
-		alprint_inst_imm(b, i, "sltiu", bp);
+		alprint_inst_imm(b, i, "sltiu", b.bp);
 	else if (!strcmp(b.op, "001100")) // ANDI
-		alprint_inst_imm(b, i, "addi", bp);
+		alprint_inst_imm(b, i, "addi", b.bp);
 	else if (!strcmp(b.op, "001101")) // ORI
-		alprint_inst_imm(b, i, "ori", bp);
+		alprint_inst_imm(b, i, "ori", b.bp);
 	else if (!strcmp(b.op, "001110")) // XORI
-		alprint_inst_imm(b, i, "xori", bp);
+		alprint_inst_imm(b, i, "xori", b.bp);
 	else if (!strcmp(b.op, "001111")) // LUI
-		alprint_inst_1imm(b, i, "lui", bp);
+		alprint_inst_1imm(b, i, "lui", b.bp);
 	else if (!strcmp(b.op, "100000")) // LB
-		alprint_inst_1off(b, i, "lb", bp);
+		alprint_inst_1off(b, i, "lb", b.bp);
 	else if (!strcmp(b.op, "100001")) // LH
-		alprint_inst_1off(b, i, "lh", bp);
+		alprint_inst_1off(b, i, "lh", b.bp);
 	else if (!strcmp(b.op, "100011")) // LW
-		alprint_inst_1off(b, i, "lw", bp);
+		alprint_inst_1off(b, i, "lw", b.bp);
 	else if (!strcmp(b.op, "100100")) // LBU
-		alprint_inst_1off(b, i, "lbu", bp);
+		alprint_inst_1off(b, i, "lbu", b.bp);
 	else if (!strcmp(b.op, "100101")) // LHU
-		alprint_inst_1off(b, i, "lhu", bp);
+		alprint_inst_1off(b, i, "lhu", b.bp);
 	else if (!strcmp(b.op, "101000")) // SB
-		alprint_inst_1off(b, i, "sb", bp);
+		alprint_inst_1off(b, i, "sb", b.bp);
 	else if (!strcmp(b.op, "101001")) // SH
-		alprint_inst_1off(b, i, "sh", bp);
+		alprint_inst_1off(b, i, "sh", b.bp);
 	else if (!strcmp(b.op, "101011")) // SW
-		alprint_inst_1off(b, i, "sw", bp);
+		alprint_inst_1off(b, i, "sw", b.bp);
 	else
 		alprint_unknown(b, i);
 }
