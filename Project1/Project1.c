@@ -5,7 +5,7 @@
 
 typedef struct {
 	unsigned char inst[4];
-	unsigned char full_bin[33];
+	char full_bin[33];
 	unsigned char op[7];
 	unsigned char fn[7];
 } BCode;
@@ -21,7 +21,7 @@ void shell(char* c);
 void readFile(FILE* f, BCode* li);
 
 void inst_config(BCode* list, int len);
-unsigned char* hex2bin(unsigned char h, int r);
+char* hex2bin(unsigned char h, int r);
 
 void alprint_master(BCode b, int i);
 BParsed parse_inst_bin(BCode b);
@@ -40,14 +40,12 @@ void alprint_inst_1imm(BCode li, int i, const char* op, BParsed p);
 void alprint_inst_1off(BCode li, int i, const char* op, BParsed p);
 void alprint_unknown(BCode li, int i);
 
-long charbin2long(unsigned char* c);
-int charbin2int(unsigned char* c);
 char* mygets(char* s);
 
 int main() {
 	char command[100];
 	char* object;
-
+	
 	while (1) {
 		shell(command);
 
@@ -59,7 +57,7 @@ int main() {
 
 		else {
 			object = strtok(command, " ");
-			if (!strcmp(object, "read")) {
+			if (strcmp(object, "read") == 0) {
 				if (object = strtok(NULL, " ")) {
 					int list_len = 0;
 					unsigned char buffer[4];
@@ -73,7 +71,7 @@ int main() {
 
 					FILE* f = fopen(object, "rb");
 					BCode* inst_list = (BCode*)malloc(sizeof(BCode) * list_len);
-
+					
 					readFile(f, inst_list);
 					inst_config(inst_list, list_len);
 
@@ -114,10 +112,10 @@ void readFile(FILE* f, BCode* li) {
 
 void inst_config(BCode* li, int len) {
 	for (int i = 0; i < len; i++) {
-		unsigned char bin[33];
-		strcpy(li[i].full_bin, hex2bin(li[i].inst[0], 0));
-		for (int j = 1; j < 4; j++)
-			strcat(li[i].full_bin, hex2bin(li[i].inst[j], 0));
+		unsigned char bin[33] = "";
+		for (int j = 0; j < 4; j++)
+			strcat(bin, hex2bin(li[i].inst[j], 0));
+		strcpy(li[i].full_bin, bin);
 		int k;
 		for (k = 0; k < 6; k++) {
 			li[i].op[k] = li[i].full_bin[k];
@@ -125,69 +123,67 @@ void inst_config(BCode* li, int len) {
 		}
 		li[i].op[k] = '\0';
 		li[i].fn[k] = '\0';
-		printf("%d: %s\n", i, li[i].full_bin);
 	}
 }
 
-
-unsigned char* hex2bin(unsigned char h, int r) {
+char* hex2bin(unsigned char h, int r) {
 	if (r == 0) {
-		unsigned char bin[9] = "";
-		strcpy(bin, hex2bin(h / 0x10, 1));
+		char bin[9] = { '\0' };
+		strcat(bin, hex2bin(h / 0x10, 1));
 		strcat(bin, hex2bin(h % 0x10, 1));
 		return bin;
 	}
 	else if (r == 1) {
-		unsigned char bin[5];
+		char bin[5] = "";
 		switch (h - 0x00)
 		{
 		case 0x00:
-			strcpy(bin, "0000");
+			strcat(bin, "0000");
 			break;
 		case 0x01:
-			strcpy(bin, "0001");
+			strcat(bin, "0001");
 			break;
 		case 0x02:
-			strcpy(bin, "0010");
+			strcat(bin, "0010");
 			break;
 		case 0x03:
-			strcpy(bin, "0011");
+			strcat(bin, "0011");
 			break;
 		case 0x04:
-			strcpy(bin, "0100");
+			strcat(bin, "0100");
 			break;
 		case 0x05:
-			strcpy(bin, "0101");
+			strcat(bin, "0101");
 			break;
 		case 0x06:
-			strcpy(bin, "0110");
+			strcat(bin, "0110");
 			break;
 		case 0x07:
-			strcpy(bin, "0111");
+			strcat(bin, "0111");
 			break;
 		case 0x08:
-			strcpy(bin, "1000");
+			strcat(bin, "1000");
 			break;
 		case 0x09:
-			strcpy(bin, "1001");
+			strcat(bin, "1001");
 			break;
 		case 0x0A:
-			strcpy(bin, "1010");
+			strcat(bin, "1010");
 			break;
 		case 0x0B:
-			strcpy(bin, "1011");
+			strcat(bin, "1011");
 			break;
 		case 0x0C:
-			strcpy(bin, "1100");
+			strcat(bin, "1100");
 			break;
 		case 0x0D:
-			strcpy(bin, "1101");
+			strcat(bin, "1101");
 			break;
 		case 0x0E:
-			strcpy(bin, "1110");
+			strcat(bin, "1110");
 			break;
 		case 0x0F:
-			strcpy(bin, "1111");
+			strcat(bin, "1111");
 			break;
 		default:
 			break;
@@ -353,8 +349,8 @@ void alprint_inst_sys(BCode li, int i, const char* op) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3], op);
 }
 void alprint_inst_j(BCode li, int i, const char* op, BParsed p) {
-	unsigned char targ[27];
-	strcpy(targ, p.b6_b10);
+	unsigned char targ[27] = "";
+	strcat(targ, p.b6_b10);
 	strcat(targ, p.b11_b15);
 	strcat(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
@@ -363,8 +359,8 @@ void alprint_inst_j(BCode li, int i, const char* op, BParsed p) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3], op, charbin2long(targ));
 }
 void alprint_inst_2off(BCode li, int i, const char* op, BParsed p) {
-	unsigned char targ[17];
-	strcpy(targ, p.b16_b20);
+	unsigned char targ[17] = "";
+	strcat(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, $%d, %ld\n",
@@ -372,8 +368,8 @@ void alprint_inst_2off(BCode li, int i, const char* op, BParsed p) {
 		charbin2int(p.b6_b10), charbin2int(p.b11_b15), charbin2long(targ));
 }
 void alprint_inst_imm(BCode li, int i, const char* op, BParsed p) {
-	unsigned char targ[17];
-	strcpy(targ, p.b16_b20);
+	unsigned char targ[17] = "";
+	strcat(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, $%d, %ld\n",
@@ -381,8 +377,8 @@ void alprint_inst_imm(BCode li, int i, const char* op, BParsed p) {
 		charbin2int(p.b11_b15), charbin2int(p.b6_b10), charbin2long(targ));
 }
 void alprint_inst_1imm(BCode li, int i, const char* op, BParsed p) {
-	unsigned char targ[17];
-	strcpy(targ, p.b16_b20);
+	unsigned char targ[17] = "";
+	strcat(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, %ld\n",
@@ -390,8 +386,8 @@ void alprint_inst_1imm(BCode li, int i, const char* op, BParsed p) {
 		charbin2int(p.b11_b15), charbin2long(targ));
 }
 void alprint_inst_1off(BCode li, int i, const char* op, BParsed p) {
-	unsigned char targ[17];
-	strcpy(targ, p.b16_b20);
+	unsigned char targ[17] = "";
+	strcat(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, %ld($%d)\n",
@@ -403,7 +399,7 @@ void alprint_unknown(BCode li, int i) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3]);
 }
 
-long charbin2long(unsigned char* c) {
+long charbin2long(char* c) {
 	//printf("========%s=======\n", c);
 	long s = -1 * (c[0] - '0');
 	int i = 0;
@@ -419,8 +415,8 @@ long charbin2long(unsigned char* c) {
 	long raw = atol(c);
 	long res = 0;
 
-	while (i > 0) {
-		if (c[i - 1] == '1')
+	while (i>0) {
+		if (c[i-1] == '1')
 			res += (long)(pow(2.0, d - i));
 		i--;
 	}
@@ -430,7 +426,7 @@ long charbin2long(unsigned char* c) {
 		return s * (res + 1);
 }
 
-int charbin2int(unsigned char* c) {
+int charbin2int(char* c) {
 	int raw = atol(c);
 	int i = 0;
 	int d = strlen(c);
@@ -449,9 +445,8 @@ int charbin2int(unsigned char* c) {
 
 
 char* mygets(char* s) {
-	char buffer;
+	char buffer = NULL;
 	int i = 0;
-
 
 	do {
 		buffer = (char)getchar();
@@ -466,5 +461,6 @@ char* mygets(char* s) {
 
 	} while (1);
 	rewind(stdin);
+
 	return s;
 }

@@ -21,7 +21,7 @@ void shell(char* c);
 void readFile(FILE* f, BCode* li);
 
 void inst_config(BCode* list, int len);
-unsigned char* hex2bin(unsigned char h, int r);
+char* hex2bin(unsigned char h, char* dd, int r);
 
 void alprint_master(BCode b, int i);
 BParsed parse_inst_bin(BCode b);
@@ -64,7 +64,7 @@ int main() {
 					int list_len = 0;
 					unsigned char buffer[4];
 					FILE* len = fopen(object, "rb");
-					if (len == NULL)
+					if (!len)
 						continue;
 
 					while (fread(buffer, sizeof(unsigned char), 4, len) != 0)
@@ -113,11 +113,13 @@ void readFile(FILE* f, BCode* li) {
 }
 
 void inst_config(BCode* li, int len) {
-	for (int i = 0; i < len; i++) {
-		unsigned char bin[33];
-		strcpy(li[i].full_bin, hex2bin(li[i].inst[0], 0));
-		for (int j = 1; j < 4; j++)
-			strcat(li[i].full_bin, hex2bin(li[i].inst[j], 0));
+	int i = 0;
+	for (i; i < len; i++) {
+		int j = 0;
+		for(j; j < 33; j++)
+			li[i].full_bin[j] = '\0';
+		for (j = 0; j < 4; j++)
+			hex2bin(li[i].inst[j], li[i].full_bin, 0);
 		int k;
 		for (k = 0; k < 6; k++) {
 			li[i].op[k] = li[i].full_bin[k];
@@ -125,74 +127,69 @@ void inst_config(BCode* li, int len) {
 		}
 		li[i].op[k] = '\0';
 		li[i].fn[k] = '\0';
-		printf("%d: %s\n", i, li[i].full_bin);
 	}
 }
 
 
-unsigned char* hex2bin(unsigned char h, int r) {
+char* hex2bin(unsigned char h, char* dd, int r) {
 	if (r == 0) {
-		unsigned char bin[9] = "";
-		strcpy(bin, hex2bin(h / 0x10, 1));
-		strcat(bin, hex2bin(h % 0x10, 1));
-		return bin;
+		hex2bin(h / 0x10, dd, 1);
+		hex2bin(h % 0x10, dd, 1);
 	}
 	else if (r == 1) {
-		unsigned char bin[5];
 		switch (h - 0x00)
 		{
 		case 0x00:
-			strcpy(bin, "0000");
+			strcat(dd, "0000");
 			break;
 		case 0x01:
-			strcpy(bin, "0001");
+			strcat(dd, "0001");
 			break;
 		case 0x02:
-			strcpy(bin, "0010");
+			strcat(dd, "0010");
 			break;
 		case 0x03:
-			strcpy(bin, "0011");
+			strcat(dd, "0011");
 			break;
 		case 0x04:
-			strcpy(bin, "0100");
+			strcat(dd, "0100");
 			break;
 		case 0x05:
-			strcpy(bin, "0101");
+			strcat(dd, "0101");
 			break;
 		case 0x06:
-			strcpy(bin, "0110");
+			strcat(dd, "0110");
 			break;
 		case 0x07:
-			strcpy(bin, "0111");
+			strcat(dd, "0111");
 			break;
 		case 0x08:
-			strcpy(bin, "1000");
+			strcat(dd, "1000");
 			break;
 		case 0x09:
-			strcpy(bin, "1001");
+			strcat(dd, "1001");
 			break;
 		case 0x0A:
-			strcpy(bin, "1010");
+			strcat(dd, "1010");
 			break;
 		case 0x0B:
-			strcpy(bin, "1011");
+			strcat(dd, "1011");
 			break;
 		case 0x0C:
-			strcpy(bin, "1100");
+			strcat(dd, "1100");
 			break;
 		case 0x0D:
-			strcpy(bin, "1101");
+			strcat(dd, "1101");
 			break;
 		case 0x0E:
-			strcpy(bin, "1110");
+			strcat(dd, "1110");
 			break;
 		case 0x0F:
-			strcpy(bin, "1111");
+			strcat(dd, "1111");
 			break;
 		default:
 			break;
 		}
-		return bin;
 	}
 }
 
