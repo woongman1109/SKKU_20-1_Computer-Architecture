@@ -21,7 +21,7 @@ void shell(char* c);
 void readFile(FILE* f, BCode* li);
 
 void inst_config(BCode* list, int len);
-char* hex2bin(unsigned char h, char* dd, int r);
+void hex2bin(unsigned char h, char* dd, int r);
 
 void alprint_master(BCode b, int i);
 BParsed parse_inst_bin(BCode b);
@@ -81,6 +81,7 @@ int main() {
 						alprint_master(inst_list[p], p);
 
 					free(inst_list);
+					fclose(f);
 					continue;
 				}
 				else {
@@ -131,7 +132,7 @@ void inst_config(BCode* li, int len) {
 }
 
 
-char* hex2bin(unsigned char h, char* dd, int r) {
+void hex2bin(unsigned char h, char* dd, int r) {
 	if (r == 0) {
 		hex2bin(h / 0x10, dd, 1);
 		hex2bin(h % 0x10, dd, 1);

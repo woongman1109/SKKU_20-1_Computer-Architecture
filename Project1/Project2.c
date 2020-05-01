@@ -4,17 +4,17 @@
 #include <math.h>
 
 typedef struct {
-	char inst[4];
-	char full_bin[33];
-	char op[7];
-	char fn[7];
+	unsigned char inst[4];
+	unsigned char full_bin[33];
+	unsigned char op[7];
+	unsigned char fn[7];
 } BCode;
 
 typedef struct {
-	char b6_b10[6];
-	char b11_b15[6];
-	char b16_b20[6];
-	char b21_b25[6];
+	unsigned char b6_b10[6];
+	unsigned char b11_b15[6];
+	unsigned char b16_b20[6];
+	unsigned char b21_b25[6];
 } BParsed;
 
 typedef struct {
@@ -28,30 +28,34 @@ typedef struct {
 	char full_bin[33];
 } Mem_4;
 
-void initMem(Mem_4 m, long i);
+void initMem(Mem_4* m, long i);
 
 void shell(char* c);
 void readFile(FILE* f, BCode* li);
 
 void inst_config(BCode* list, int len);
 void inst_mem_config(BCode* list, int len, Mem_4* m);
-void hex2bin( char h, char* dd, int r);
+void hex2bin(unsigned char h, char* dd, int r);
 
 void alprint_master(BCode b, int i);
 BParsed parse_inst_bin(BCode b);
 
 void alprint_inst_3ar(BCode li, int i, const char* op, BParsed p);
-
 void alprint_inst_3sh(BCode li, int i, const char* op, BParsed p);
 void alprint_inst_3sl(BCode li, int i, const char* op, BParsed p);
-
+void alprint_inst_md(BCode li, int i, const char* op, BParsed p);
+void alprint_inst_1rs(BCode li, int i, const char* op, BParsed p);
+void alprint_inst_mf(BCode li, int i, const char* op, BParsed p);
+void alprint_inst_sys(BCode li, int i, const char* op);
+void alprint_inst_j(BCode li, int i, const char* op, BParsed p);
+void alprint_inst_2off(BCode li, int i, const char* op, BParsed p);
 void alprint_inst_imm(BCode li, int i, const char* op, BParsed p);
 void alprint_inst_1imm(BCode li, int i, const char* op, BParsed p);
-
+void alprint_inst_1off(BCode li, int i, const char* op, BParsed p);
 void alprint_unknown(BCode li, int i);
 
-int charbin2int(char* c);
-long charbin2long(char* c);
+long charbin2long(unsigned char* c);
+int charbin2int(unsigned char* c);
 char* mygets(char* s);
 
 int main() {
@@ -74,24 +78,22 @@ int main() {
 		Mem_4* memory = (Mem_4*)malloc(sizeof(Mem_4) * list_len);
 		shell(command);
 
-		if (strcmp(command, "exit") == 0) {
-			free(inst_list);
+		if (strcmp(command, "exit") == 0)
 			break;
-		}
 
 		else if (strlen(command) == 0)
 			continue;
 
 		else {
 			object = strtok(command, " ");
-			if (strcmp(object, "read") == 0) {
+			if (!strcmp(object, "read")) {
 				if (object = strtok(NULL, " ")) {
-					 char buffer[4];
+					unsigned char buffer[4];
 					FILE* len = fopen(object, "rb");
-					if (len == NULL)
+					if (!len)
 						continue;
 
-					while (fread(buffer, sizeof( char), 4, len) != 0)
+					while (fread(buffer, sizeof(unsigned char), 4, len) != 0)
 						list_len++;
 					fclose(len);
 
@@ -102,9 +104,11 @@ int main() {
 					readFile(f, inst_list);
 					inst_config(inst_list, list_len);
 
-					for (i = 0; i < list_len; i++)
+					for (i; i < list_len; i++)
 						alprint_master(inst_list[i], i);
 
+					free(inst_list);
+					free(memory);
 					continue;
 				}
 				else {
@@ -114,10 +118,9 @@ int main() {
 			}
 			else if (strcmp(object, "loadinst") == 0) {
 				if (object = strtok(NULL, " ")) {
-					int i = 0;
-					 char buffer[4];
+					unsigned char buffer[4];
 					FILE* len = fopen(object, "rb");
-					if (len == NULL)
+					if (!len)
 						continue;
 
 					while (fread(buffer, sizeof( char), 4, len) != 0)
@@ -127,18 +130,19 @@ int main() {
 					FILE* f = fopen(object, "rb");
 					inst_list = (BCode*)realloc(inst_list, sizeof(BCode) * list_len);
 					memory = (Mem_4*)realloc(memory, sizeof(Mem_4) * list_len);
-					for (i; i < list_len; i++) {
-						initMem(memory[i], (long)(i));
-					}
+					initMem(memory, list_len);
 
 					readFile(f, inst_list);
+					inst_config(inst_list, list_len);
 					inst_mem_config(inst_list, list_len, memory);
 
 					
 
 
 
-
+					free(inst_list);
+					free(memory);
+					fclose(f);
 					continue;
 				}
 				else {
@@ -155,18 +159,20 @@ int main() {
 			else continue;
 		}
 	}
-
 	return 0;
 }
 
-void initMem(Mem_4 m, long i) {
-	strcpy(m.full_bin, "11111111");
-	m.i = i;
-	m.address = m.i * 4;
+void initMem(Mem_4* m, int l) {
+	long i = 0;
+	for (i; i < l; i++) {
+		strcpy(m[i].full_bin, "11111111111111111111111111111111");
+		m[i].i = i;
+		m[i].address = m[i].i * 4;
+	}
 }
 
 void shell(char* c) {
-	printf("mips_sim> ");
+	printf("mips-sim> ");
 	mygets(c);
 	rewind(stdin);
 }
@@ -174,9 +180,9 @@ void shell(char* c) {
 void readFile(FILE* f, BCode* li) {
 	int l = 0;
 	int size = 32;
-	 char buffer[4];
+	unsigned char buffer[4];
 
-	while (fread(buffer, sizeof( char), 4, f) != 0) {
+	while (fread(buffer, sizeof(unsigned char), 4, f) != 0) {
 		for (int i = 0; i < 4; i++)
 			li[l].inst[i] = buffer[i];
 		l++;
@@ -184,14 +190,13 @@ void readFile(FILE* f, BCode* li) {
 }
 
 void inst_config(BCode* li, int len) {
-	for (int i = 0; i < len; i++) {
-		char bin[33] = "";
-		char dd[9] = { '\0' };
-		for (int j = 0; j < 4; j++) {
-			hex2bin(li[i].inst[j], dd, 0);
-			strcat(bin, dd);
-		}
-		strcpy(li[i].full_bin, bin);
+	int i = 0;
+	for (i; i < len; i++) {
+		int j = 0;
+		for (j; j < 33; j++)
+			li[i].full_bin[j] = '\0';
+		for (j = 0; j < 4; j++)
+			hex2bin(li[i].inst[j], li[i].full_bin, 0);
 		int k;
 		for (k = 0; k < 6; k++) {
 			li[i].op[k] = li[i].full_bin[k];
@@ -203,32 +208,19 @@ void inst_config(BCode* li, int len) {
 }
 
 void inst_mem_config(BCode* li, int len, Mem_4* m) {
-	for (int i = 0; i < len; i++) {
-		char bin[33] = "";
-		char dd[9] = { '\0' };
-		for (int j = 0; j < 4; j++) {
-			hex2bin(li[i].inst[j], dd, 0);
-			strcat(bin, dd);
-		}
-		strcpy(li[i].full_bin, bin);
-		int k;
-		for (k = 0; k < 6; k++) {
-			li[i].op[k] = li[i].full_bin[k];
-			li[i].fn[k] = li[i].full_bin[k + 26];
-		}
-		li[i].op[k] = '\0';
-		li[i].fn[k] = '\0';
-
-		strcpy(m[i].full_bin, bin);
-	}
+	inst_config(li, len);
+	int i = 0;
+	for (i; i < len; i++)
+		strcpy(m[i].full_bin, li[i].full_bin);
+	// for (i = 0; i < len; i++)
+	//	printf("[%05d] %ld | 0x%lx | %s\n", i, m[i].i, m[i].address, m[i].full_bin);
 }
 
-void hex2bin( char h, char* dd, int r) {
+
+void hex2bin(unsigned char h, char* dd, int r) {
 	if (r == 0) {
-		char bin[9] = { '\0' };
 		hex2bin(h / 0x10, dd, 1);
 		hex2bin(h % 0x10, dd, 1);
-		strcat(bin, dd);
 	}
 	else if (r == 1) {
 		switch (h - 0x00)
@@ -310,7 +302,6 @@ void alprint_master(BCode b, int i) {
 			alprint_inst_3ar(b, i, "addu", bp);
 		else if (!strcmp(b.fn, "100000")) // ADD
 			alprint_inst_3ar(b, i, "add", bp);
-
 		else if (!strcmp(b.fn, "000111")) // SRAV
 			alprint_inst_3sh(b, i, "srav", bp);
 		else if (!strcmp(b.fn, "000110")) // SRLV
@@ -323,10 +314,39 @@ void alprint_master(BCode b, int i) {
 			alprint_inst_3sl(b, i, "sll", bp);
 		else if (!strcmp(b.fn, "000011")) // SRA
 			alprint_inst_3sl(b, i, "sll", bp);
-
+		else if (!strcmp(b.fn, "011011")) // DIVU
+			alprint_inst_md(b, i, "divu", bp);
+		else if (!strcmp(b.fn, "011010")) // DIV
+			alprint_inst_md(b, i, "div", bp);
+		else if (!strcmp(b.fn, "011001")) // MULTU
+			alprint_inst_md(b, i, "multu", bp);
+		else if (!strcmp(b.fn, "011000")) // MULT
+			alprint_inst_md(b, i, "mult", bp);
+		else if (!strcmp(b.fn, "001001")) // JALR
+			alprint_inst_1rs(b, i, "jalr", bp);
+		else if (!strcmp(b.fn, "010011")) // MTLO
+			alprint_inst_1rs(b, i, "mtlo", bp);
+		else if (!strcmp(b.fn, "010001")) // MTHI
+			alprint_inst_1rs(b, i, "mthi", bp);
+		else if (!strcmp(b.fn, "001000")) // JR
+			alprint_inst_1rs(b, i, "jr", bp);
+		else if (!strcmp(b.fn, "010010")) // MFLO
+			alprint_inst_mf(b, i, "mflo", bp);
+		else if (!strcmp(b.fn, "010000")) // MFHI
+			alprint_inst_mf(b, i, "mfhi", bp);
+		else if (!strcmp(b.fn, "001100")) // SYSCALL
+			alprint_inst_sys(b, i, "syscall");
 		else
 			alprint_unknown(b, i);
 	}
+	else if (!strcmp(b.op, "000010")) // J
+		alprint_inst_j(b, i, "j", bp);
+	else if (!strcmp(b.op, "000011")) // JAL
+		alprint_inst_j(b, i, "jal", bp);
+	else if (!strcmp(b.op, "000100")) // BEQ
+		alprint_inst_2off(b, i, "beq", bp);
+	else if (!strcmp(b.op, "000101")) // BNE
+		alprint_inst_2off(b, i, "bne", bp);
 	else if (!strcmp(b.op, "001000")) // ADDI
 		alprint_inst_imm(b, i, "addi", bp);
 	else if (!strcmp(b.op, "001001")) // ADDIU
@@ -343,7 +363,22 @@ void alprint_master(BCode b, int i) {
 		alprint_inst_imm(b, i, "xori", bp);
 	else if (!strcmp(b.op, "001111")) // LUI
 		alprint_inst_1imm(b, i, "lui", bp);
-
+	else if (!strcmp(b.op, "100000")) // LB
+		alprint_inst_1off(b, i, "lb", bp);
+	else if (!strcmp(b.op, "100001")) // LH
+		alprint_inst_1off(b, i, "lh", bp);
+	else if (!strcmp(b.op, "100011")) // LW
+		alprint_inst_1off(b, i, "lw", bp);
+	else if (!strcmp(b.op, "100100")) // LBU
+		alprint_inst_1off(b, i, "lbu", bp);
+	else if (!strcmp(b.op, "100101")) // LHU
+		alprint_inst_1off(b, i, "lhu", bp);
+	else if (!strcmp(b.op, "101000")) // SB
+		alprint_inst_1off(b, i, "sb", bp);
+	else if (!strcmp(b.op, "101001")) // SH
+		alprint_inst_1off(b, i, "sh", bp);
+	else if (!strcmp(b.op, "101011")) // SW
+		alprint_inst_1off(b, i, "sw", bp);
 	else
 		alprint_unknown(b, i);
 }
@@ -401,8 +436,8 @@ void alprint_inst_sys(BCode li, int i, const char* op) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3], op);
 }
 void alprint_inst_j(BCode li, int i, const char* op, BParsed p) {
-	char targ[27] = "";
-	strcat(targ, p.b6_b10);
+	unsigned char targ[27];
+	strcpy(targ, p.b6_b10);
 	strcat(targ, p.b11_b15);
 	strcat(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
@@ -411,8 +446,8 @@ void alprint_inst_j(BCode li, int i, const char* op, BParsed p) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3], op, charbin2long(targ));
 }
 void alprint_inst_2off(BCode li, int i, const char* op, BParsed p) {
-	char targ[17] = "";
-	strcat(targ, p.b16_b20);
+	unsigned char targ[17];
+	strcpy(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, $%d, %ld\n",
@@ -420,8 +455,8 @@ void alprint_inst_2off(BCode li, int i, const char* op, BParsed p) {
 		charbin2int(p.b6_b10), charbin2int(p.b11_b15), charbin2long(targ));
 }
 void alprint_inst_imm(BCode li, int i, const char* op, BParsed p) {
-	char targ[17] = "";
-	strcat(targ, p.b16_b20);
+	unsigned char targ[17];
+	strcpy(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, $%d, %ld\n",
@@ -429,8 +464,8 @@ void alprint_inst_imm(BCode li, int i, const char* op, BParsed p) {
 		charbin2int(p.b11_b15), charbin2int(p.b6_b10), charbin2long(targ));
 }
 void alprint_inst_1imm(BCode li, int i, const char* op, BParsed p) {
-	char targ[17] = "";
-	strcat(targ, p.b16_b20);
+	unsigned char targ[17];
+	strcpy(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, %ld\n",
@@ -438,8 +473,8 @@ void alprint_inst_1imm(BCode li, int i, const char* op, BParsed p) {
 		charbin2int(p.b11_b15), charbin2long(targ));
 }
 void alprint_inst_1off(BCode li, int i, const char* op, BParsed p) {
-	char targ[17] = "";
-	strcat(targ, p.b16_b20);
+	unsigned char targ[17];
+	strcpy(targ, p.b16_b20);
 	strcat(targ, p.b21_b25);
 	strcat(targ, li.fn);
 	printf("inst %d: %02x%02x%02x%02x %s $%d, %ld($%d)\n",
@@ -451,7 +486,7 @@ void alprint_unknown(BCode li, int i) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3]);
 }
 
-long charbin2long(char* c) {
+long charbin2long(unsigned char* c) {
 	//printf("========%s=======\n", c);
 	long s = -1 * (c[0] - '0');
 	int i = 0;
@@ -478,7 +513,7 @@ long charbin2long(char* c) {
 		return s * (res + 1);
 }
 
-int charbin2int(char* c) {
+int charbin2int(unsigned char* c) {
 	int raw = atol(c);
 	int i = 0;
 	int d = strlen(c);
@@ -497,8 +532,9 @@ int charbin2int(char* c) {
 
 
 char* mygets(char* s) {
-	char buffer = '0';
+	char buffer;
 	int i = 0;
+
 
 	do {
 		buffer = (char)getchar();
@@ -513,6 +549,5 @@ char* mygets(char* s) {
 
 	} while (1);
 	rewind(stdin);
-
 	return s;
 }
