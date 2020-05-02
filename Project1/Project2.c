@@ -20,27 +20,26 @@ typedef struct {
 
 typedef struct {
 	int num;
-	char full_bin[33];
+	int data;
 } Register;
 
 typedef struct {
 	long i;
 	long address;
-	char full_bin[33];
+	BCode bc;
 } Mem_4;
 
+void initReg(Register* reg, Register* PC);
 void initMem(Mem_4* m, long l);
 
 void shell(char* c);
 void readFile(FILE* f, BCode* li);
 
 void inst_config(BCode* list, int len);
-void inst_mem_config(BCode* list, int len, Mem_4* m);
 void hex2bin(unsigned char h, char* dd, int r);
-
-void alprint_master(BCode b, int i);
 BParsed parse_inst_bin(BCode b);
 
+void alprint_master(BCode b, int i);
 void alprint_inst_3ar(BCode li, int i, const char* op, BParsed p);
 void alprint_inst_3sh(BCode li, int i, const char* op, BParsed p);
 void alprint_inst_3sl(BCode li, int i, const char* op, BParsed p);
@@ -55,6 +54,33 @@ void alprint_inst_1imm(BCode li, int i, const char* op, BParsed p);
 void alprint_inst_1off(BCode li, int i, const char* op, BParsed p);
 void alprint_unknown(BCode li, int i);
 
+int run_inst_master(Register* r, Register* pc, Mem_4* m, int i);
+
+void run_inst_3ar_sltu(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_slt(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_nor(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_xor(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_or(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_and(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_sub(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_sub(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_add(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3ar_add(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3sh_srav(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3sh_srlv(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3sh_sllv(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3sl_srl(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3sl_sll(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_3sl_sra(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_imm_addi(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_imm_addi(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_imm_slti(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_imm_sltiu(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_imm_andi(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_imm_ori(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_imm_xori(Register* r, Register* pc, Mem_4* m, int i);
+void run_inst_1imm_lui(Register* r, Register* pc, Mem_4* m, int i);
+ 
 long charbin2long(unsigned char* c);
 int charbin2int(unsigned char* c);
 char* mygets(char* s);
@@ -65,14 +91,11 @@ int main() {
 	int i = 0;
 	int list_len = 0;
 
-	char init[33] = "00000000000000000000000000000000";
 	Register reg[32];
-	Register PC = { -1, init };
-	for (i; i < 32; i++) {
-		strcpy(reg[i].full_bin, init);
-	}
-	BCode* inst_list = (BCode*)malloc(sizeof(BCode) * list_len);
-	Mem_4* memory = (Mem_4*)malloc(sizeof(Mem_4) * list_len);
+	Register PC;
+	initReg(reg, &PC);
+	BCode* inst_list = (BCode*)malloc(sizeof(BCode) * 64);
+	Mem_4 memory[64];
 
 	while (1) {
 		shell(command);
@@ -101,7 +124,6 @@ int main() {
 					fclose(len);
 
 					FILE* f = fopen(object, "rb");
-					inst_list = (BCode*)realloc(inst_list, sizeof(BCode) * list_len);
 					readFile(f, inst_list);
 					inst_config(inst_list, list_len);
 
@@ -126,19 +148,23 @@ int main() {
 					if (!len)
 						continue;
 
-					while (fread(buffer, sizeof( char), 4, len) != 0)
+					while (fread(buffer, sizeof(unsigned char), 4, len) != 0)
 						list_len++;
 					fclose(len);
 
 					FILE* f = fopen(object, "rb");
-					inst_list = (BCode*)realloc(inst_list, sizeof(BCode) * list_len);
-					memory = (Mem_4*)realloc(memory, sizeof(Mem_4) * list_len);
 					initMem(memory, list_len);
+					for (i=0; i < list_len; i++) {
+						inst_list[i].bp = parse_inst_bin(inst_list[i]);
+						memory[i].bc.bp = parse_inst_bin(inst_list[i]);
+					}
 
 					readFile(f, inst_list);
 					inst_config(inst_list, list_len);
-					inst_mem_config(inst_list, list_len, memory);
-					
+
+					for (i = 0; i < list_len; i++)
+						memory[i].bc = inst_list[i];
+
 					fclose(f);
 					continue;
 				}
@@ -148,10 +174,28 @@ int main() {
 				}
 			}
 			else if (strcmp(object, "run") == 0) {
-
+				if (object = strtok(NULL, " ")) {
+					int state = 0;
+					i = 0;
+					initReg(reg, &PC);
+					while (1) {
+						if (i + 1 > atoi(object))
+							break;
+						state = run_inst_master(reg, &PC, memory, i++);
+						
+						if (state == -1) {
+							printf("unknown instruction\n");
+							i--;
+							break;
+						}
+					}
+					printf("Executed %d instructions\n", i);
+				}
 			}
-			else if (strcmp(object, "register") == 0) {
-
+			else if (strcmp(object, "registers") == 0) {
+				for (i = 0; i < 32; i++)
+					printf("$%d: 0x%08x\n", i, reg[i].data);
+				printf("PC: 0x%08x\n", PC.data);
 			}
 			else continue;
 		}
@@ -159,10 +203,20 @@ int main() {
 	return 0;
 }
 
+void initReg(Register* reg, Register* PC) {
+	int i = 0;
+	PC->num = -1;
+	PC->data = 0;
+	for (i; i < 32; i++) {
+		reg[i].num = i;
+		reg[i].data = 0;
+	}
+}
+
 void initMem(Mem_4* m, long l) {
-	long i = 0;
+	int i = 0;
 	for (i; i < l; i++) {
-		strcpy(m[i].full_bin, "11111111111111111111111111111111");
+		strcpy(m[i].bc.full_bin, "11111111111111111111111111111111");
 		m[i].i = i;
 		m[i].address = m[i].i * 4;
 	}
@@ -203,16 +257,6 @@ void inst_config(BCode* li, int len) {
 		li[i].fn[k] = '\0';
 	}
 }
-
-void inst_mem_config(BCode* li, int len, Mem_4* m) {
-	inst_config(li, len);
-	int i = 0;
-	for (i; i < len; i++)
-		strcpy(m[i].full_bin, li[i].full_bin);
-	// for (i = 0; i < len; i++)
-	//	printf("[%05d] %05ld | 0x%08lx | %s\n", i, m[i].i, m[i].address, m[i].full_bin);
-}
-
 
 void hex2bin(unsigned char h, char* dd, int r) {
 	if (r == 0) {
@@ -401,7 +445,6 @@ void alprint_inst_3ar(BCode li, int i, const char* op, BParsed p) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3], op,
 		charbin2int(p.b16_b20), charbin2int(p.b6_b10), charbin2int(p.b11_b15));
 }
-
 void alprint_inst_3sh(BCode li, int i, const char* op, BParsed p) {
 	printf("inst %d: %02x%02x%02x%02x %s $%d, $%d, $%d\n",
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3], op,
@@ -482,6 +525,160 @@ void alprint_unknown(BCode li, int i) {
 		i, li.inst[0], li.inst[1], li.inst[2], li.inst[3]);
 }
 
+int run_inst_master(Register* r, Register* pc, Mem_4* m, int i) {
+	int res = 0;
+	// printf("[%d] %s\n", i, m[i].bc.op);
+	if (!strcmp(m[i].bc.op, "000000")) {
+		if (!strcmp(m[i].bc.fn, "101011")) // SLTU
+			run_inst_3ar_sltu(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "101010")) // SLT
+			run_inst_3ar_slt(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100111")) // NOR
+			run_inst_3ar_nor(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100110")) // XOR
+			run_inst_3ar_xor(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100101")) // OR
+			run_inst_3ar_or(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100100")) // AND
+			run_inst_3ar_and(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100011")) // SUBU
+			run_inst_3ar_sub(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100010")) // SUB
+			run_inst_3ar_sub(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100001")) // ADDU
+			run_inst_3ar_add(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "100000")) // ADD
+			run_inst_3ar_add(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "000111")) // SRAV
+			run_inst_3sh_srav(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "000110")) // SRLV
+			run_inst_3sh_srlv(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "000100")) // SLLV
+			run_inst_3sh_sllv(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "000010")) // SRL
+			run_inst_3sl_srl(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "000000")) // SLL
+			run_inst_3sl_sll(r, pc, m, i);
+		else if (!strcmp(m[i].bc.fn, "000011")) // SRA
+			run_inst_3sl_sra(r, pc, m, i);
+		else
+			res = -1;
+	}
+	else if (!strcmp(m[i].bc.op, "001000")) // ADDI
+		run_inst_imm_addi(r, pc, m, i);
+	else if (!strcmp(m[i].bc.op, "001001")) // ADDIU
+		run_inst_imm_addi(r, pc, m, i);
+	else if (!strcmp(m[i].bc.op, "001010")) // SLTI
+		run_inst_imm_slti(r, pc, m, i);
+	else if (!strcmp(m[i].bc.op, "001011")) // SLTIU
+		run_inst_imm_sltiu(r, pc, m, i);
+	else if (!strcmp(m[i].bc.op, "001100")) // ANDI
+		run_inst_imm_andi(r, pc, m, i);
+	else if (!strcmp(m[i].bc.op, "001101")) // ORI
+		run_inst_imm_ori(r, pc, m, i);
+	else if (!strcmp(m[i].bc.op, "001110")) // XORI
+		run_inst_imm_xori(r, pc, m, i);
+	else if (!strcmp(m[i].bc.op, "001111")) // LUI
+		run_inst_1imm_lui(r, pc, m, i);
+	else
+		res = -1;
+
+	pc->data += 4;
+	return res;
+}
+
+void run_inst_3ar_sltu(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = (unsigned)(r[charbin2int(m[i].bc.bp.b6_b10)].data) < (unsigned)(r[charbin2int(m[i].bc.bp.b11_b15)].data) ? 1 : 0;
+}
+void run_inst_3ar_slt(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data < r[charbin2int(m[i].bc.bp.b11_b15)].data ? 1 : 0;
+}
+void run_inst_3ar_nor(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = ~(r[charbin2int(m[i].bc.bp.b6_b10)].data | r[charbin2int(m[i].bc.bp.b11_b15)].data);
+}
+void run_inst_3ar_xor(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data ^ r[charbin2int(m[i].bc.bp.b11_b15)].data;
+}
+void run_inst_3ar_or(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data | r[charbin2int(m[i].bc.bp.b11_b15)].data;
+}
+void run_inst_3ar_and(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data & r[charbin2int(m[i].bc.bp.b11_b15)].data;
+}
+void run_inst_3ar_sub(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data - r[charbin2int(m[i].bc.bp.b11_b15)].data;
+}
+void run_inst_3ar_add(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data + r[charbin2int(m[i].bc.bp.b11_b15)].data;
+}
+void run_inst_3sh_srav(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data >> r[charbin2int(m[i].bc.bp.b11_b15)].data;
+}
+void run_inst_3sh_srlv(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = (unsigned int)r[charbin2int(m[i].bc.bp.b11_b15)].data >> r[charbin2int(m[i].bc.bp.b6_b10)].data;
+}
+void run_inst_3sh_sllv(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = (r[charbin2int(m[i].bc.bp.b6_b10)].data) << r[charbin2int(m[i].bc.bp.b11_b15)].data;
+}
+void run_inst_3sl_srl(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = (unsigned int)(r[charbin2int(m[i].bc.bp.b11_b15)].data) >> (unsigned int)(charbin2int(m[i].bc.bp.b21_b25));
+}
+void run_inst_3sl_sll(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = (r[charbin2int(m[i].bc.bp.b6_b10)].data) << charbin2int(m[i].bc.bp.b21_b25);
+}
+void run_inst_3sl_sra(Register* r, Register* pc, Mem_4* m, int i) {
+	r[charbin2int(m[i].bc.bp.b16_b20)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data >> charbin2int(m[i].bc.bp.b21_b25);
+}
+void run_inst_imm_addi(Register* r, Register* pc, Mem_4* m, int i) {
+	unsigned char targ[17];
+	strcpy(targ, m[i].bc.bp.b16_b20);
+	strcat(targ, m[i].bc.bp.b21_b25);
+	strcat(targ, m[i].bc.fn);
+	r[charbin2int(m[i].bc.bp.b11_b15)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data + (int)(charbin2long(targ));
+}
+void run_inst_imm_slti(Register* r, Register* pc, Mem_4* m, int i) {
+	unsigned char targ[17];
+	strcpy(targ, m[i].bc.bp.b16_b20);
+	strcat(targ, m[i].bc.bp.b21_b25);
+	strcat(targ, m[i].bc.fn);
+	r[charbin2int(m[i].bc.bp.b11_b15)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data < (int)(charbin2long(targ)) ? 1 : 0;
+}
+void run_inst_imm_sltiu(Register* r, Register* pc, Mem_4* m, int i) {
+	unsigned char targ[17];
+	strcpy(targ, m[i].bc.bp.b16_b20);
+	strcat(targ, m[i].bc.bp.b21_b25);
+	strcat(targ, m[i].bc.fn);
+	r[charbin2int(m[i].bc.bp.b11_b15)].data = (unsigned)r[charbin2int(m[i].bc.bp.b6_b10)].data < (unsigned int)(int)(charbin2long(targ)) ? 1 : 0;
+}
+void run_inst_imm_andi(Register* r, Register* pc, Mem_4* m, int i) {
+	unsigned char targ[17];
+	strcpy(targ, m[i].bc.bp.b16_b20);
+	strcat(targ, m[i].bc.bp.b21_b25);
+	strcat(targ, m[i].bc.fn);
+	r[charbin2int(m[i].bc.bp.b11_b15)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data & (int)(charbin2long(targ));
+}
+void run_inst_imm_ori(Register* r, Register* pc, Mem_4* m, int i) {
+	unsigned char targ[17];
+	strcpy(targ, m[i].bc.bp.b16_b20);
+	strcat(targ, m[i].bc.bp.b21_b25);
+	strcat(targ, m[i].bc.fn);
+	r[charbin2int(m[i].bc.bp.b11_b15)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data | (int)(charbin2long(targ));
+}
+void run_inst_imm_xori(Register* r, Register* pc, Mem_4* m, int i) {
+	unsigned char targ[17];
+	strcpy(targ, m[i].bc.bp.b16_b20);
+	strcat(targ, m[i].bc.bp.b21_b25);
+	strcat(targ, m[i].bc.fn);
+	r[charbin2int(m[i].bc.bp.b11_b15)].data = r[charbin2int(m[i].bc.bp.b6_b10)].data ^ (int)(charbin2long(targ));
+}
+void run_inst_1imm_lui(Register* r, Register* pc, Mem_4* m, int i) {
+	unsigned char targ[17];
+	strcpy(targ, m[i].bc.bp.b16_b20);
+	strcat(targ, m[i].bc.bp.b21_b25);
+	strcat(targ, m[i].bc.fn);
+	r[charbin2int(m[i].bc.bp.b11_b15)].data = (unsigned int)(int)(charbin2long(targ)) << 16;
+}
+
 long charbin2long(unsigned char* c) {
 	//printf("========%s=======\n", c);
 	long s = -1 * (c[0] - '0');
@@ -510,7 +707,7 @@ long charbin2long(unsigned char* c) {
 }
 
 int charbin2int(unsigned char* c) {
-	int raw = atol(c);
+	int raw = atoi(c);
 	int i = 0;
 	int d = strlen(c);
 	int res = 0;
@@ -525,7 +722,6 @@ int charbin2int(unsigned char* c) {
 	}
 	return res;
 }
-
 
 char* mygets(char* s) {
 	char buffer;
